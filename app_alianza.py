@@ -8,7 +8,6 @@ st.title("Análisis de ETFs")
 
 #### Selector de Datos ####
 
-
 # Crear un multiselector usando st.multiselect
 etfs_seleccionados = st.multiselect(
     "Selecciona uno o más ETFs para ver los detalles:",
@@ -31,7 +30,8 @@ if etfs_seleccionados:
             st.markdown("---")  # Línea divisoria entre cada ETF
 else:
     st.write("Por favor, selecciona al menos un ETF para ver los detalles.")
-    # Función para obtener datos financieros de un ETF de Yahoo Finance
+
+# Función para obtener datos financieros de un ETF de Yahoo Finance
 def obtener_datos_etf(ticker, periodo):
     # Descarga los datos históricos del ETF
     etf = yf.Ticker(ticker)
@@ -71,4 +71,5 @@ if not datos_etf.empty:
     # Visualización de los datos
     st.line_chart(datos_etf['Close'], width=0, height=0, use_container_width=True)
 else:
+    # Código que se ejecuta si no hay datos para el ETF seleccionado
     st.write("No se encontraron datos para el ETF seleccionado en el periodo especificado.")
