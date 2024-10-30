@@ -167,6 +167,8 @@ if etfs_seleccionados:
         
         if monto_inversion > 0:
             rendimientos_por_etf = {}
+            all_data = []  # Para almacenar datos de todos los ETFs
+            
             for etf_name in etfs_seleccionados:
                 etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
                 if etf_info:
@@ -178,6 +180,7 @@ if etfs_seleccionados:
                         rendimiento, _ = calcular_rendimiento_riesgo(datos_etf)
                         rendimiento_total = monto_inversion * (1 + rendimiento)
                         rendimientos_por_etf[ticker] = rendimiento_total
+                        all_data.append(datos_etf['Close'])  # Agregar los precios de cierre para la gráfica
                     else:
                         st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
 
@@ -186,9 +189,19 @@ if etfs_seleccionados:
             for ticker, rendimiento in rendimientos_por_etf.items():
                 st.write(f"**{ticker}**: {rendimiento:.2f}")
 
+            # Gráfico de la evolución del precio de cierre para cada ETF
+            if all_data:
+                st.write("### Evolución del Precio de Cierre")
+                df_all_data = pd.concat(all_data, axis=1)
+                df_all_data.columns = etfs_seleccionados  # Renombrar columnas con los nombres de los ETFs
+                st.line_chart(df_all_data)  # Gráfico de línea
+
+        else:
+            st.warning("Por favor, ingresa un monto de inversión mayor a 0.")
+
     # Pestaña 5: Descargar Datos
     with tab5:
-        st.header("Descargar Datos")
+        st.write("### Descargar Datos de ETFs Seleccionados")
         for etf_name in etfs_seleccionados:
             etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
             if etf_info:
@@ -206,6 +219,8 @@ if etfs_seleccionados:
                     )
                 else:
                     st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
-
 else:
     st.warning("Por favor, selecciona al menos un ETF para continuar.")
+
+
+
