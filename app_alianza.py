@@ -51,7 +51,7 @@ periodo_seleccionado = st.sidebar.selectbox("Selecciona el periodo", ("1mo", "3m
 # Verificar si hay algún ETF seleccionado
 if etfs_seleccionados:
     # Crear pestañas para organizar las secciones
-    tab1, tab2, tab3, tab4 = st.tabs(["Detalles del ETF", "Visualización de Precios", "Análisis Estadístico", "Descargar Datos"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Detalles del ETF", "Visualización de Precios", "Análisis Estadístico", "Rendimiento", "Descargar Datos"])
 
     # Pestaña 1: Detalles del ETF
     with tab1:
@@ -160,29 +160,52 @@ if etfs_seleccionados:
             st.write("### Tabla de Correlación de Rendimientos entre ETFs Seleccionados")
             st.write(rendimientos_df.corr())
 
-    # Pestaña 4: Descargar Datos
+    # Pestaña 4: Rendimiento
     with tab4:
+        st.header("Cálculo de Rendimiento")
+        monto_inversion = st.number_input("Ingresa la cantidad de inversión inicial:", min_value=0.0, format="%.2f")
+        
+        if monto_inversion > 0:
+            rendimientos_por_etf = {}
+            for etf_name in etfs_seleccionados:
+                etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
+                if etf_info:
+                    ticker = etf_info['simbolo']
+                    with st.spinner(f'Cargando datos para {ticker}...'):
+                        datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
+
+                    if not datos_etf.empty:
+                        rendimiento, _ = calcular_rendimiento_riesgo(datos_etf)
+                        rendimiento_total = monto_inversion * (1 + rendimiento)
+                        rendimientos_por_etf[ticker] = rendimiento_total
+                    else:
+                        st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
+
+            # Mostrar los resultados
+            st.write("### Rendimiento Estimado por ETF")
+            for ticker, rendimiento in rendimientos_por_etf.items():
+                st.write(f"**{ticker}**: {rendimiento:.2f}")
+
+    # Pestaña 5: Descargar Datos
+    with tab5:
+        st.header("Descargar Datos")
         for etf_name in etfs_seleccionados:
             etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
             if etf_info:
                 ticker = etf_info['simbolo']
-                
                 with st.spinner(f'Cargando datos para {ticker}...'):
                     datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
 
                 if not datos_etf.empty:
-                    # Opción para descargar los datos
-                    st.write("### Descargar Datos")
                     csv = datos_etf.to_csv().encode('utf-8')
                     st.download_button(
-                        label=f"Descargar datos históricos de {ticker} como CSV",
+                        label=f"Descargar datos de {ticker}",
                         data=csv,
-                        file_name=f"{ticker}_datos_historicos.csv",
-                        mime='text/csv'
+                        file_name=f"{ticker}_datos.csv",
+                        mime="text/csv"
                     )
                 else:
                     st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
+
 else:
     st.warning("Por favor, selecciona al menos un ETF para continuar.")
-
-
