@@ -5,8 +5,6 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
-from fpdf import FPDF
-import io
 
 # Función para obtener datos financieros de un ETF de Yahoo Finance con caché
 @st.cache_data
@@ -26,38 +24,6 @@ def calcular_sharpe_ratio(rendimientos, tasa_libre_de_riesgo=0.02):
     exceso_rendimiento = rendimientos - tasa_libre_de_riesgo
     sharpe_ratio = exceso_rendimiento.mean() / exceso_rendimiento.std() * (252 ** 0.5)
     return sharpe_ratio
-
-# Función para generar un PDF con los datos del ETF
-def generar_pdf(ticker, datos):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    
-    # Título
-    pdf.set_font("Arial", style="B", size=16)
-    pdf.cell(200, 10, txt=f"Reporte de Datos del ETF: {ticker}", ln=True, align='C')
-    pdf.ln(10)  # Espaciado
-
-    # Tabla de datos
-    pdf.set_font("Arial", size=10)
-    pdf.cell(40, 10, "Fecha", border=1)
-    pdf.cell(40, 10, "Precio de Cierre", border=1)
-    pdf.cell(40, 10, "Volumen", border=1)
-    pdf.cell(40, 10, "Precio de Apertura", border=1)
-    pdf.ln()
-
-    for index, row in datos.iterrows():
-        pdf.cell(40, 10, str(index.date()), border=1)
-        pdf.cell(40, 10, f"{row['Close']:.2f}", border=1)
-        pdf.cell(40, 10, str(int(row['Volume'])), border=1)
-        pdf.cell(40, 10, f"{row['Open']:.2f}", border=1)
-        pdf.ln()
-
-    # Retornar el PDF como bytes
-    pdf_output = io.BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
 
 # Establecer el tema de la aplicación
 st.set_page_config(page_title="Simulador Financiero de ETFs", layout="wide")
@@ -110,37 +76,128 @@ if etfs_seleccionados:
 
                 if not datos_etf.empty:
                     st.write(f"### Gráfico de Precios de Cierre para {ticker}")
-                    st.line_chart(datos_etf['Close'], use_container_width=True)
+                    st.line_chart(datos_etf['Close'], width=0, height=0, use_container_width=True)
+
+                    # Gráfico de Dispersión (Open vs Close)
+                    st.write("### Gráfico de Dispersión (Open vs Close)")
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    ax.scatter(datos_etf.index, datos_etf['Open'], color='blue', label='Precio de Apertura', alpha=0.5)
+                    ax.scatter(datos_etf.index, datos_etf['Close'], color='red', label='Precio de Cierre', alpha=0.5)
+                    ax.set_title(f'Gráfico de Dispersión: Open vs Close para {ticker}')
+                    ax.set_xlabel('Fecha')
+                    ax.set_ylabel('Precio')
+                    ax.grid(True)
+                    ax.legend()
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
+
+                    # Gráfico de Volumen de Trading
+                    st.write("### Volumen de Trading para ", ticker)
+                    fig, ax = plt.subplots(figsize=(12, 6))
+                    ax.bar(datos_etf.index, datos_etf['Volume'], color='purple', alpha=0.6)
+                    ax.set_title(f'Volumen de Trading para {ticker}')
+                    ax.set_xlabel('Fecha')
+                    ax.set_ylabel('Volumen')
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
 
                 else:
                     st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
 
     # Pestaña 3: Análisis Estadístico
     with tab3:
+        rendimientos_totales = []
         for etf_name in etfs_seleccionados:
             etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
             if etf_info:
                 ticker = etf_info['simbolo']
-                datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
-                if not datos_etf.empty:
-                    rendimiento, riesgo = calcular_rendimiento_riesgo(datos_etf)
-                    st.write(f"**Rendimiento Anualizado para {ticker}:** {rendimiento:.2%}")
-                    st.write(f"**Riesgo para {ticker}:** {riesgo:.2%}")
-                else:
-                    st.write(f"No se encontraron datos para el ETF {ticker}.")
+                
+                with st.spinner(f'Cargando datos para {ticker}...'):
+                    datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
 
-    # Pestaña 4: Rendimiento
-    with tab4:
-        monto_inversion = st.number_input("Ingresa la cantidad de inversión inicial:", min_value=0.0, format="%.2f")
-        if monto_inversion > 0:
+                if not datos_etf.empty:
+                    # Resumen estadístico
+                    st.write(f"### Resumen Estadístico para {ticker}")
+                    st.write(datos_etf.describe())
+
+                    # Calcular rendimiento y riesgo
+                    rendimiento, riesgo = calcular_rendimiento_riesgo(datos_etf)
+                    rendimientos_totales.append(datos_etf['Close'].pct_change().dropna())
+                    st.write(f"**Rendimiento Anualizado:** {rendimiento:.2%}")
+                    st.write(f"**Riesgo (Desviación Estándar Anualizada):** {riesgo:.2%}")
+
+                    # Cálculo del Sharpe Ratio
+                    sharpe_ratio = calcular_sharpe_ratio(datos_etf['Close'].pct_change().dropna())
+                    st.write(f"**Sharpe Ratio:** {sharpe_ratio:.2f}")
+
+                    # Histograma de rendimientos diarios
+                    rendimientos_diarios = datos_etf['Close'].pct_change().dropna()
+                    st.write("### Histograma de Rendimientos Diarios")
+                    fig, ax = plt.subplots()
+                    ax.hist(rendimientos_diarios, bins=30, edgecolor='black')
+                    ax.set_title(f'Histograma de Rendimientos Diarios para {ticker}')
+                    ax.set_xlabel('Rendimiento')
+                    ax.set_ylabel('Frecuencia')
+                    st.pyplot(fig)
+
+                    # Gráfico de rendimiento vs riesgo
+                    st.write("### Gráfico de Rendimiento vs Riesgo")
+                    st.scatter_chart(pd.DataFrame({'Rendimiento': [rendimiento], 'Riesgo': [riesgo]}))
+
+                else:
+                    st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
+
+        # Tabla de correlación de rendimientos diarios entre los ETFs seleccionados
+        if len(etfs_seleccionados) > 1:
+            rendimientos_df = pd.DataFrame()
             for etf_name in etfs_seleccionados:
                 etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
                 if etf_info:
                     ticker = etf_info['simbolo']
                     datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
+                    rendimientos_df[etf_name] = datos_etf['Close'].pct_change().dropna()
+
+            st.write("### Tabla de Correlación de Rendimientos entre ETFs Seleccionados")
+            st.write(rendimientos_df.corr())
+
+    # Pestaña 4: Rendimiento
+    with tab4:
+        st.header("Cálculo de Rendimiento")
+        monto_inversion = st.number_input("Ingresa la cantidad de inversión inicial:", min_value=0.0, format="%.2f")
+        
+        if monto_inversion > 0:
+            rendimientos_por_etf = {}
+            all_data = []  # Para almacenar datos de todos los ETFs
+            
+            for etf_name in etfs_seleccionados:
+                etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
+                if etf_info:
+                    ticker = etf_info['simbolo']
+                    with st.spinner(f'Cargando datos para {ticker}...'):
+                        datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
+
                     if not datos_etf.empty:
                         rendimiento, _ = calcular_rendimiento_riesgo(datos_etf)
-                        st.write(f"Rendimiento estimado para {ticker}: {monto_inversion * (1 + rendimiento):.2f}")
+                        rendimiento_total = monto_inversion * (1 + rendimiento)
+                        rendimientos_por_etf[ticker] = rendimiento_total
+                        all_data.append(datos_etf['Close'])  # Agregar los precios de cierre para la gráfica
+                    else:
+                        st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
+
+            # Mostrar los resultados
+            st.write("### Rendimiento Estimado por ETF")
+            for ticker, rendimiento in rendimientos_por_etf.items():
+                st.write(f"**{ticker}**: {rendimiento:.2f}")
+
+            # Gráfico de la evolución del precio de cierre para cada ETF
+            if all_data:
+                st.write("### Evolución del Precio de Cierre")
+                df_all_data = pd.concat(all_data, axis=1)
+                df_all_data.columns = etfs_seleccionados  # Renombrar columnas con los nombres de los ETFs
+                st.line_chart(df_all_data)  # Gráfico de línea
+
+        else:
+            st.warning("Por favor, ingresa un monto de inversión mayor a 0.")
 
     # Pestaña 5: Descargar Datos
     with tab5:
@@ -149,16 +206,19 @@ if etfs_seleccionados:
             etf_info = next((etf for etf in ETFs_Data if etf['nombre'] == etf_name), None)
             if etf_info:
                 ticker = etf_info['simbolo']
-                datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
+                with st.spinner(f'Cargando datos para {ticker}...'):
+                    datos_etf = obtener_datos_etf(ticker, periodo_seleccionado)
+
                 if not datos_etf.empty:
-                    pdf_bytes = generar_pdf(ticker, datos_etf)
+                    csv = datos_etf.to_csv().encode('utf-8')
                     st.download_button(
-                        label=f"Descargar reporte PDF de {ticker}",
-                        data=pdf_bytes,
-                        file_name=f"{ticker}_reporte.pdf",
-                        mime="application/pdf"
+                        label=f"Descargar datos de {ticker}",
+                        data=csv,
+                        file_name=f"{ticker}_datos.csv",
+                        mime="text/csv"
                     )
+                else:
+                    st.write(f"No se encontraron datos para el ETF {ticker} en el periodo especificado.")
 else:
     st.warning("Por favor, selecciona al menos un ETF para continuar.")
-
 
