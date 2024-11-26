@@ -232,4 +232,3 @@ if etfs_seleccionados:
                     file_name="Datos_Etfs.csv",
                     mime="text/csv"
                 )
-
