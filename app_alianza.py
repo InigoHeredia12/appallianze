@@ -233,4 +233,3 @@ if etfs_seleccionados:
                     mime="text/csv"
                 )
 
-
