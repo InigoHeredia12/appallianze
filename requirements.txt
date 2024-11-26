@@ -1,1 +1,4 @@
-Yfinancematplotlib==3.8.4
+Yfinancematplotlib==3.8.4pandas
+numpy
+plotly
+streamlit
