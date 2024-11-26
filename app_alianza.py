@@ -6,7 +6,6 @@ import numpy as np
 from datetime import datetime
 from io import BytesIO
 import plotly.express as px
-from fpdf import FPDF
 
 # Función para obtener datos financieros de un ETF de Yahoo Finance con caché
 @st.cache_data
@@ -232,3 +231,4 @@ if etfs_seleccionados:
                     file_name="Datos_Etfs.csv",
                     mime="text/csv"
                 )
+
